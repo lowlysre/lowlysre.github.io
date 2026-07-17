@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lowlysre — brand assets</title>
+<link rel="icon" href="/favicon.ico">
+<style>
+  :root {
+    --bg: #fdf6e3; --fg: #24292f; --muted: #57606a; --card: #ffffff; --border: #d0d7de; --accent: #2da44e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0d1117; --fg: #e6edf3; --muted: #8b949e; --card: #161b22; --border: #30363d; --accent: #3fb950; }
+  }
+  body { font-family: ui-monospace, Consolas, monospace; background: var(--bg); color: var(--fg); margin: 0; padding: 40px 24px; max-width: 960px; margin-inline: auto; }
+  header { text-align: center; margin-bottom: 48px; }
+  header img { width: 160px; height: 160px; border-radius: 24px; }
+  h1 { font-size: 28px; margin: 16px 0 4px; }
+  .tagline { color: var(--muted); margin: 0; }
+  h2 { font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 8px; margin-top: 48px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; text-align: center; }
+  .card img { width: 96px; height: 96px; border-radius: 12px; }
+  .card .transparent-preview { background: repeating-conic-gradient(#8883 0% 25%, transparent 0% 50%) 0 0 / 16px 16px; border-radius: 12px; display: inline-block; }
+  .card h3 { font-size: 14px; margin: 10px 0 6px; }
+  .links { font-size: 12px; line-height: 1.9; }
+  .links a { color: var(--accent); text-decoration: none; margin: 0 3px; }
+  .links a:hover { text-decoration: underline; }
+  footer { margin-top: 56px; text-align: center; color: var(--muted); font-size: 13px; }
+  footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <picture>
+    <source srcset="/assets/svg/logo-dark.svg" media="(prefers-color-scheme: dark)">
+    <img src="/assets/svg/logo-light.svg" alt="lowlysre inchworm logo">
+  </picture>
+  <h1>lowlysre</h1>
+  <p class="tagline">brand assets · the lowly inchworm</p>
+</header>
+
+<h2>SVG (source of truth)</h2>
+<div class="grid" id="svg-grid"></div>
+
+<h2>PNG</h2>
+<div class="grid" id="png-grid"></div>
+
+<h2>Favicon</h2>
+<div class="grid">
+  <div class="card">
+    <img src="/favicon.ico" alt="favicon" style="width:32px;height:32px;">
+    <h3>favicon.ico</h3>
+    <div class="links"><a href="/favicon.ico" download>download</a></div>
+  </div>
+</div>
+
+<footer>
+  <p><a href="https://github.com/lowlysre">github.com/lowlysre</a></p>
+</footer>
+
+<script>
+const variants = [
+  { id: 'logo-light',  name: 'Logo · light',  transparent: false },
+  { id: 'logo-dark',   name: 'Logo · dark',   transparent: false },
+  { id: 'icon-light',  name: 'Icon · light',  transparent: false },
+  { id: 'icon-dark',   name: 'Icon · dark',   transparent: false },
+  { id: 'mark-green',  name: 'Mark · transparent', transparent: true },
+];
+const sizes = [16, 32, 64, 128, 256, 512, 1024];
+
+document.getElementById('svg-grid').innerHTML = variants.map(v => `
+  <div class="card">
+    <span class="${v.transparent ? 'transparent-preview' : ''}"><img src="/assets/svg/${v.id}.svg" alt="${v.name}"></span>
+    <h3>${v.name}</h3>
+    <div class="links"><a href="/assets/svg/${v.id}.svg" download>${v.id}.svg</a></div>
+  </div>`).join('');
+
+document.getElementById('png-grid').innerHTML = variants.map(v => `
+  <div class="card">
+    <span class="${v.transparent ? 'transparent-preview' : ''}"><img src="/assets/png/${v.id}-256.png" alt="${v.name}"></span>
+    <h3>${v.name}</h3>
+    <div class="links">${sizes.map(s => `<a href="/assets/png/${v.id}-${s}.png" download>${s}</a>`).join(' ')}</div>
+  </div>`).join('');
+</script>
+</body>
+</html>
