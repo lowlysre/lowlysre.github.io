@@ -1,6 +1,6 @@
 # lowlysre.github.io
 
-Brand assets for the [lowlysre](https://github.com/lowlysre) org — home of the lowly inchworm. 🐛
+Brand assets for the [lowlysre](https://github.com/lowlysre) org - home of the lowly inchworm. 🐛
 
 **Live gallery:** <https://lowlysre.github.io>
 
