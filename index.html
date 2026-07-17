@@ -56,6 +56,10 @@
 
 <script>
 const HIDDEN = new Set(['.github', 'lowlysre.github.io']);
+// Curated live links shown on matching project cards
+const LIVE_LINKS = {
+  'cron-drift': { label: 'live dashboard', url: 'https://lowlysre.grafana.net/public-dashboards/66e12b0c83214d88ab4040521de1e874' },
+};
 const langColors = { JavaScript: '#f1e05a', TypeScript: '#3178c6', Python: '#3572A5', Go: '#00ADD8', Rust: '#dea584', Shell: '#89e051', HTML: '#e34c26', Jsonnet: '#0064bd', Dockerfile: '#384d54' };
 
 fetch('https://api.github.com/orgs/lowlysre/repos?per_page=100&sort=updated')
@@ -65,14 +69,15 @@ fetch('https://api.github.com/orgs/lowlysre/repos?per_page=100&sort=updated')
     shown.sort((a, b) => b.stargazers_count - a.stargazers_count || a.name.localeCompare(b.name));
     document.getElementById('status').style.display = 'none';
     document.getElementById('projects').innerHTML = shown.map(r => `
-      <a class="card" href="${r.html_url}">
+      <div class="card" onclick="location.href='${r.html_url}'" style="cursor:pointer;">
         <h2>${r.name}</h2>
         <p>${r.description ? r.description.replace(/</g, '&lt;') : 'No description yet.'}</p>
         <div class="meta">
           ${r.language ? `<span><i class="lang-dot" style="background:${langColors[r.language] || 'var(--accent)'}"></i>${r.language}</span>` : ''}
           <span>★ ${r.stargazers_count}</span>
+          ${LIVE_LINKS[r.name] ? `<span><a href="${LIVE_LINKS[r.name].url}" style="color:var(--accent);text-decoration:none;" onclick="event.stopPropagation()">📈 ${LIVE_LINKS[r.name].label}</a></span>` : ''}
         </div>
-      </a>`).join('');
+      </div>`).join('');
   })
   .catch(() => {
     document.getElementById('status').innerHTML =
