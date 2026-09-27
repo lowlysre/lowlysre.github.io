@@ -20,13 +20,19 @@
   h1 { font-size: 32px; margin: 20px 0 6px; letter-spacing: 1px; }
   .tagline { color: var(--muted); margin: 0; font-size: 15px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; display: flex; flex-direction: column; transition: border-color .15s, transform .15s; text-decoration: none; color: inherit; }
+  .section { margin-bottom: 44px; }
+  .section h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin: 0 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; transition: border-color .15s, transform .15s; text-decoration: none; color: inherit; }
   .card:hover { border-color: var(--accent); transform: translateY(-2px); }
-  .card h2 { font-size: 16px; margin: 0 0 8px; color: var(--accent); }
-  .card p { font-size: 13.5px; color: var(--muted); margin: 0 0 14px; line-height: 1.5; flex: 1; }
-  .meta { font-size: 12px; color: var(--muted); display: flex; gap: 14px; }
-  .meta span::before { content: ''; }
+  .card .hero { width: 100%; aspect-ratio: 1200 / 630; object-fit: cover; display: block; }
+  .card .card-foot { padding: 10px 16px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 12px; }
+  .card .card-foot .links { display: flex; flex-wrap: wrap; gap: 10px; margin-left: auto; }
+  .card .card-foot a { color: var(--accent); text-decoration: none; }
+  .card .card-foot a:hover { text-decoration: underline; }
+  .card .card-foot.placeholder { justify-content: center; opacity: 0.5; font-style: italic; }
   .lang-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); margin-right: 5px; vertical-align: -1px; }
+  .card .topics { padding: 0 16px 12px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .card .topic { font-size: 11px; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; }
   #status { text-align: center; color: var(--muted); padding: 32px; }
   footer { margin-top: 64px; text-align: center; color: var(--muted); font-size: 13px; line-height: 2; }
   footer a { color: var(--accent); text-decoration: none; }
@@ -45,7 +51,7 @@
 </header>
 
 <div id="status">loading projects…</div>
-<div class="grid" id="projects"></div>
+<div id="projects"></div>
 
 <footer>
   <a href="https://github.com/lowlysre">github.com/lowlysre</a> ·
@@ -56,28 +62,85 @@
 
 <script>
 const HIDDEN = new Set(['.github', 'lowlysre.github.io']);
-// Curated live links shown on matching project cards
-const LIVE_LINKS = {
-  'cron-drift': { label: 'live dashboard', url: 'https://lowlysre.grafana.net/public-dashboards/66e12b0c83214d88ab4040521de1e874' },
-};
 const langColors = { JavaScript: '#f1e05a', TypeScript: '#3178c6', Python: '#3572A5', Go: '#00ADD8', Rust: '#dea584', Shell: '#89e051', HTML: '#e34c26', Jsonnet: '#0064bd', Dockerfile: '#384d54' };
+
+// GitHub Actions expose a marketplace listing; the manifest is read from raw.githubusercontent.com
+// (CORS-enabled, not counted against api.github.com's rate limit) instead of the contents API.
+async function getActionMarketplaceLink(r) {
+  for (const file of ['action.yml', 'action.yaml']) {
+    try {
+      const res = await fetch(`https://raw.githubusercontent.com/${r.full_name}/${r.default_branch}/${file}`);
+      if (!res.ok) continue;
+      const yaml = await res.text();
+      const name = (yaml.match(/^name:\s*['"]?([^'"\n]+)['"]?/m) || [, r.name])[1];
+      const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      return `https://github.com/marketplace/actions/${slug}`;
+    } catch { /* try next filename */ }
+  }
+  return null;
+}
+
+// No batch endpoint exists for "latest release across an org", so this is one api.github.com call per repo.
+async function getLatestRelease(r) {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${r.full_name}/releases/latest`);
+    if (res.ok) { const rel = await res.json(); return { tag: rel.tag_name, url: rel.html_url }; }
+  } catch { /* no releases */ }
+  return null;
+}
 
 fetch('https://api.github.com/orgs/lowlysre/repos?per_page=100&sort=updated')
   .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-  .then(repos => {
+  .then(async repos => {
     const shown = repos.filter(r => !HIDDEN.has(r.name) && !r.archived && !r.fork);
     shown.sort((a, b) => b.stargazers_count - a.stargazers_count || a.name.localeCompare(b.name));
+    const [marketplaceLinks, releases] = await Promise.all([
+      Promise.all(shown.map(getActionMarketplaceLink)),
+      Promise.all(shown.map(getLatestRelease)),
+    ]);
     document.getElementById('status').style.display = 'none';
-    document.getElementById('projects').innerHTML = shown.map(r => `
+
+    function renderCard(r, i) {
+      const links = [
+        marketplaceLinks[i] ? `<a href="${marketplaceLinks[i]}" onclick="event.stopPropagation()">🧩 Marketplace</a>` : '',
+        releases[i] ? `<a href="${releases[i].url}" onclick="event.stopPropagation()">🏷️ ${releases[i].tag}</a>` : '',
+      ].filter(Boolean).join('');
+      const topics = r.topics && r.topics.length
+        ? `<div class="topics">${r.topics.slice(0, 4).map(t => `<span class="topic">${t}</span>`).join('')}</div>` : '';
+      const isEmpty = !r.language && !links && !topics;
+      const foot = isEmpty
+        ? `<div class="card-foot placeholder">🐛 still inching along</div>`
+        : `<div class="card-foot">
+            ${r.language ? `<span class="lang"><i class="lang-dot" style="background:${langColors[r.language] || 'var(--accent)'}"></i>${r.language}</span>` : '<span></span>'}
+            ${links ? `<span class="links">${links}</span>` : ''}
+          </div>${topics}`;
+      return `
       <div class="card" onclick="location.href='${r.html_url}'" style="cursor:pointer;">
-        <h2>${r.name}</h2>
-        <p>${r.description ? r.description.replace(/</g, '&lt;') : 'No description yet.'}</p>
-        <div class="meta">
-          ${r.language ? `<span><i class="lang-dot" style="background:${langColors[r.language] || 'var(--accent)'}"></i>${r.language}</span>` : ''}
-          <span>★ ${r.stargazers_count}</span>
-          ${LIVE_LINKS[r.name] ? `<span><a href="${LIVE_LINKS[r.name].url}" style="color:var(--accent);text-decoration:none;" onclick="event.stopPropagation()">📈 ${LIVE_LINKS[r.name].label}</a></span>` : ''}
-        </div>
-      </div>`).join('');
+        <img class="hero" src="https://opengraph.githubassets.com/1/${r.full_name}" alt="${r.name}" loading="lazy" onerror="this.remove()">
+        ${foot}
+      </div>`;
+    }
+
+    // Group into GitHub Actions / repos with releases / everything else, in that priority order.
+    const groups = [
+      { title: '🧩 GitHub Actions', items: [] },
+      { title: '🚀 Shipped', items: [] },
+      { title: '🐛 Other Projects', items: [] },
+    ];
+    shown.forEach((r, i) => {
+      if (marketplaceLinks[i]) groups[0].items.push(i);
+      else if (releases[i]) groups[1].items.push(i);
+      else groups[2].items.push(i);
+    });
+
+    document.getElementById('projects').innerHTML = groups
+      .filter(g => g.items.length)
+      .map(g => `
+        <section class="section">
+          <h2>${g.title}</h2>
+          <div class="grid">${g.items.map(i => renderCard(shown[i], i)).join('')}</div>
+        </section>`)
+      .join('');
   })
   .catch(() => {
     document.getElementById('status').innerHTML =
