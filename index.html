@@ -89,6 +89,14 @@ async function getLatestRelease(r) {
   return null;
 }
 
+// opengraph.githubassets.com renders on demand and drops requests under burst load, so retry with backoff.
+function retryHero(img) {
+  const n = +(img.dataset.tries || 0) + 1;
+  img.dataset.tries = n;
+  if (n > 4) { img.remove(); return; }
+  setTimeout(() => { img.src = `${img.dataset.src}?r=${n}`; }, n * 1500 + Math.random() * 1000);
+}
+
 fetch('https://api.github.com/orgs/lowlysre/repos?per_page=100&sort=updated')
   .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
   .then(async repos => {
@@ -116,7 +124,7 @@ fetch('https://api.github.com/orgs/lowlysre/repos?per_page=100&sort=updated')
           </div>${topics}`;
       return `
       <div class="card" onclick="location.href='${r.html_url}'" style="cursor:pointer;">
-        <img class="hero" src="https://opengraph.githubassets.com/1/${r.full_name}" alt="${r.name}" loading="lazy" onerror="this.remove()">
+        <img class="hero" src="https://opengraph.githubassets.com/1/${r.full_name}" alt="${r.name}" loading="lazy" data-src="https://opengraph.githubassets.com/1/${r.full_name}" onerror="retryHero(this)">
         ${foot}
       </div>`;
     }
