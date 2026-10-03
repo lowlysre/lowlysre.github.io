@@ -87,7 +87,8 @@ async function getLatestRelease(r) {
   try {
     const res = await fetch(`https://api.github.com/repos/${r.full_name}/releases/latest`);
     if (res.ok) { const rel = await res.json(); return { tag: rel.tag_name, url: rel.html_url }; }
-  } catch { /* no releases */ }
+    if (res.status === 403 || res.status === 429) throw new Error('rate limited');
+  } catch (e) { if (e.message === 'rate limited') throw e; }
   return null;
 }
 
@@ -106,15 +107,36 @@ function retryHero(img) {
   setTimeout(() => { img.src = `${img.dataset.src}?r=${n}`; }, n * 1500 + Math.random() * 1000);
 }
 
-fetch('https://api.github.com/orgs/lowlysre/repos?per_page=100&sort=updated')
-  .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-  .then(async repos => {
-    const shown = repos.filter(r => !HIDDEN.has(r.name) && !r.archived && !r.fork);
+// Unauthenticated api.github.com allows 60 requests/hour per IP and each load costs one call per repo,
+// so cache the result and fall back to stale data if the limit is hit.
+async function loadData() {
+  const KEY = 'lowlysre-portal-v1', TTL = 60 * 60 * 1000;
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(KEY)); } catch { /* ignore */ }
+  if (cached && Date.now() - cached.t < TTL) return cached.d;
+  try {
+    const res = await fetch('https://api.github.com/orgs/lowlysre/repos?per_page=100&sort=updated');
+    if (!res.ok) throw new Error(res.status);
+    const repos = await res.json();
+    const shown = repos.filter(r => !HIDDEN.has(r.name) && !r.archived && !r.fork)
+      .map(r => ({ name: r.name, full_name: r.full_name, html_url: r.html_url, default_branch: r.default_branch,
+                   language: r.language, topics: r.topics, stargazers_count: r.stargazers_count }));
     shown.sort((a, b) => b.stargazers_count - a.stargazers_count || a.name.localeCompare(b.name));
     const [marketplaceLinks, releases] = await Promise.all([
       Promise.all(shown.map(getActionMarketplaceLink)),
       Promise.all(shown.map(getLatestRelease)),
     ]);
+    const d = { shown, marketplaceLinks, releases };
+    try { localStorage.setItem(KEY, JSON.stringify({ t: Date.now(), d })); } catch { /* ignore */ }
+    return d;
+  } catch (e) {
+    if (cached) return cached.d;
+    throw e;
+  }
+}
+
+loadData()
+  .then(({ shown, marketplaceLinks, releases }) => {
     document.getElementById('status').style.display = 'none';
 
     function renderCard(r, i) {
